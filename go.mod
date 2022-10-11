@@ -3,6 +3,7 @@ module github.com/1uLang/libspb
 go 1.16
 
 require (
+	github.com/ZZMarquis/gm v1.3.2
 	github.com/fatih/color v1.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil v3.21.11+incompatible

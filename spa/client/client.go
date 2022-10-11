@@ -19,6 +19,9 @@ var (
 	SPAEncryptMethodAES128CFB = "aes-128-cfb"
 	SPAEncryptMethodAES192CFB = "aes-192-cfb"
 	SPAEncryptMethodAES256CFB = "aes-256-cfb"
+	encryptMethodGMSM2ECC     = "gm-sm2-ecc"
+	encryptMethodGMSM3SUM     = "gm-sm3-sum"
+	encryptMethodGMSM4CBC     = "gm-sm4-cbc"
 )
 
 type Client struct {

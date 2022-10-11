@@ -1,5 +1,15 @@
 package encrypt
 
+const (
+	encryptMethodRaw = iota
+	encryptMethodAES128CFB
+	encryptMethodAES192CFB
+	encryptMethodAES256CFB
+	encryptMethodGMSM2ECC
+	encryptMethodGMSM3SUM
+	encryptMethodGMSM4CBC
+)
+
 type MethodInterface interface {
 	// 初始化
 	Init(key []byte, iv []byte) error
