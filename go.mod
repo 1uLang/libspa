@@ -3,6 +3,7 @@ module github.com/1uLang/libspb
 go 1.16
 
 require (
+	github.com/1uLang/libnet v0.0.0-20221019073629-36756eb44721
 	github.com/ZZMarquis/gm v1.3.2
 	github.com/fatih/color v1.13.0
 	github.com/pkg/errors v0.9.1

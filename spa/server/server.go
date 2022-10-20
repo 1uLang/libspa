@@ -3,11 +3,12 @@ package spaserver
 import (
 	"errors"
 	"fmt"
-	"github.com/1uLang/libspb/encrypt"
+	"github.com/1uLang/libnet"
+	"github.com/1uLang/libnet/connection"
+	"github.com/1uLang/libnet/options"
 	"github.com/1uLang/libspb/iptables"
 	"github.com/1uLang/libspb/spa"
 	"github.com/fatih/color"
-	"log"
 	"net"
 	"strings"
 )
@@ -54,19 +55,38 @@ func New() *Server {
 	}
 }
 
+// OnConnect 当TCP长连接建立成功是回调
+func (c *Server) OnConnect(conn *connection.Connection) {
+
+}
+
+// OnMessage 当客户端有数据写入是回调
+func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
+	c.print("data length:%d,addr:%v", len(buf), conn.RemoteAddr())
+	//解析udp spa 认证包
+	body, err := spa.ParsePacket(buf)
+	if err != nil {
+		c.print("parse packet,err", err)
+		return
+	}
+	c.doIAM(body, spa.GetIP(conn.RemoteAddr()))
+}
+
+// OnClose 当客户端主动断开链接或者超时时回调,err返回关闭的原因
+func (c *Server) OnClose(conn *connection.Connection, err error) {}
+
 // Run 启动spa服务
-func (c *Server) Run() error {
+func (c *Server) Run(opts ...options.Option) error {
 	if err := c.check(); err != nil {
 		return errors.New("config error:" + err.Error())
 	}
 	//初始化加密通用key,iv
-	encrypt.Init(c.KEY, c.IV)
 	color.Green("start spa server,listen 0.0.0.0:%d[%s]\n", c.Port, c.Protocol)
 	switch c.Protocol {
 	case "tcp":
-		return c.listenTCP()
+		return c.listenTCP(opts...)
 	case "udp":
-		return c.listenUDP()
+		return c.listenUDP(opts...)
 	}
 	return nil
 }
@@ -109,68 +129,27 @@ func (c *Server) print(a ...interface{}) {
 }
 
 // 开启tcp服务监听端口
-func (c *Server) listenTCP() error {
+func (c *Server) listenTCP(opts ...options.Option) error {
 
-	ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", c.Port))
+	svr, err := libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...)
 	if err != nil {
-		return InvalidConfigPortUse
+		panic(err)
 	}
-	defer ln.Close()
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		go c.handleConn(conn)
-	}
-}
-
-// tcp服务处理新连接
-func (c *Server) handleConn(conn net.Conn) {
-
-	defer conn.Close()
-	var buf [1024]byte
-
-	rlen, err := conn.Read(buf[:])
+	err = svr.RunTCP()
 	if err != nil {
-		c.print("read tcp failed,err", err)
-		return
+		panic(err)
 	}
-	c.print("data length:%d,addr:%v", rlen, conn.RemoteAddr().String())
-	//解析udp spa 认证包
-	body, err := spa.ParsePacket(buf[:rlen])
-	if err != nil {
-		c.print("parse packet,err", err)
-		return
-	}
-	c.doIAM(body, spa.GetIP(conn.RemoteAddr().String()))
+	return nil
 }
 
 // 开启udp服务监听端口
-func (c *Server) listenUDP() error {
-	listen, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: c.Port})
+func (c *Server) listenUDP(opts ...options.Option) error {
+	svr, err := libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	defer listen.Close() //关闭监听
-	for true {
-		var buf [1024]byte
-		rlen, addr, err := listen.ReadFromUDP(buf[:]) //接受UDP数据
-		if err != nil {
-			c.print("read udp failed,err", err)
-			continue
-		}
-		c.print("data length:%d,addr:%v", rlen, addr)
+	err = svr.RunUDP()
 
-		//解析udp spa 认证包
-		body, err := spa.ParsePacket(buf[:rlen])
-		if err != nil {
-			c.print("parse packet,err", err)
-			continue
-		}
-		c.doIAM(body, addr.IP.String())
-	}
 	return nil
 }
 
