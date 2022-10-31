@@ -9,6 +9,7 @@ import (
 	"github.com/1uLang/libspa"
 	"github.com/1uLang/libspa/iptables"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 )
@@ -33,10 +34,10 @@ type Server struct {
 	//spa 放行时间
 	Timeout int
 	//spa 身份认证回调
-	IAMcb func(body *libspa.Body) (*Allow, error)
+	IAMcb   func(body *libspa.Body) (*Allow, error)
+	handler Handler
 }
 type Allow struct {
-	Enable   bool
 	TcpPorts []int
 	UdpPorts []int
 }
@@ -51,29 +52,34 @@ func New() *Server {
 
 // OnConnect 当TCP长连接建立成功是回调
 func (c *Server) OnConnect(conn *connection.Connection) {
-
+	c.handler.OnConnect(conn)
 }
 
 // OnMessage 当客户端有数据写入是回调
 func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
 	c.print("data length:%d,addr:%v", len(buf), conn.RemoteAddr())
 	//解析udp spa 认证包
-	body, err := libspa.ParsePacket(buf)
+	allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf))
 	if err != nil {
 		c.print("parse packet,err", err)
 		return
 	}
-	c.doIAM(body, libspa.GetIP(conn.RemoteAddr()))
+	if allow != nil {
+		c.doAllow(libspa.GetIP(conn.RemoteAddr()), allow)
+	} else {
+		c.print("[%s] is block", libspa.GetIP(conn.RemoteAddr()))
+	}
 }
 
 // OnClose 当客户端主动断开链接或者超时时回调,err返回关闭的原因
 func (c *Server) OnClose(conn *connection.Connection, err error) {}
 
 // Run 启动spa服务
-func (c *Server) Run(opts ...options.Option) error {
+func (c *Server) Run(handler Handler, opts ...options.Option) error {
 	if err := c.check(); err != nil {
 		return errors.New("config error:" + err.Error())
 	}
+	c.handler = handler
 	//初始化加密通用key,iv
 	color.Green("start spa server,listen 0.0.0.0:%d[%s]\n", c.Port, c.Protocol)
 	switch c.Protocol {
@@ -117,9 +123,7 @@ func (c *Server) check() (err error) {
 
 // 打印调试信息
 func (c *Server) print(a ...interface{}) {
-	if c.Test {
-		fmt.Println(a...)
-	}
+	log.Debug(a...)
 }
 
 // 开启tcp服务监听端口
@@ -145,22 +149,6 @@ func (c *Server) listenUDP(opts ...options.Option) error {
 	err = svr.RunUDP()
 
 	return nil
-}
-
-// 进行身份检测
-func (c *Server) doIAM(body *libspa.Body, ip string) {
-	if c.IAMcb != nil {
-		allow, err := c.IAMcb(body)
-		if err != nil {
-			c.print("do iam callback,err", err)
-			return
-		}
-		if allow != nil && allow.Enable {
-			c.doAllow(ip, allow)
-		} else {
-			c.print("[%s] is block", ip)
-		}
-	}
 }
 
 // 设置IP放行
