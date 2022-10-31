@@ -24,10 +24,6 @@ var (
 )
 
 type Server struct {
-	//加密key
-	KEY string
-	//加密iv
-	IV string
 	//协议
 	Protocol string
 	//监听端口
@@ -50,8 +46,6 @@ func New() *Server {
 	return &Server{
 		Protocol: "udp",
 		Timeout:  30,
-		KEY:      magicKey,
-		IV:       magicKey[:16],
 	}
 }
 
