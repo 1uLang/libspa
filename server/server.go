@@ -33,8 +33,6 @@ type Server struct {
 	Test bool
 	//spa 放行时间
 	Timeout int
-	//spa 身份认证回调
-	IAMcb   func(body *libspa.Body) (*Allow, error)
 	handler Handler
 }
 type Allow struct {
@@ -52,27 +50,35 @@ func New() *Server {
 
 // OnConnect 当TCP长连接建立成功是回调
 func (c *Server) OnConnect(conn *connection.Connection) {
-	c.handler.OnConnect(conn)
+	if c.handler != nil {
+		c.handler.OnConnect(conn)
+	}
 }
 
 // OnMessage 当客户端有数据写入是回调
 func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
 	c.print("data length:%d,addr:%v", len(buf), conn.RemoteAddr())
 	//解析udp spa 认证包
-	allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf))
-	if err != nil {
-		c.print("parse packet,err", err)
-		return
-	}
-	if allow != nil {
-		c.doAllow(libspa.GetIP(conn.RemoteAddr()), allow)
-	} else {
-		c.print("[%s] is block", libspa.GetIP(conn.RemoteAddr()))
+	if c.handler != nil {
+		allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf))
+		if err != nil {
+			c.print("parse packet,err", err)
+			return
+		}
+		if allow != nil {
+			c.doAllow(libspa.GetIP(conn.RemoteAddr()), allow)
+		} else {
+			c.print("[%s] is block", libspa.GetIP(conn.RemoteAddr()))
+		}
 	}
 }
 
 // OnClose 当客户端主动断开链接或者超时时回调,err返回关闭的原因
-func (c *Server) OnClose(conn *connection.Connection, err error) {}
+func (c *Server) OnClose(conn *connection.Connection, err error) {
+	if c.handler != nil {
+		c.handler.OnClose(conn, err)
+	}
+}
 
 // Run 启动spa服务
 func (c *Server) Run(handler Handler, opts ...options.Option) error {
@@ -114,9 +120,6 @@ func (c *Server) check() (err error) {
 	ln.Close()
 	if c.Timeout <= 0 {
 		return InvalidConfigTimeout
-	}
-	if c.IAMcb == nil {
-		return errors.New("please set spa accept packet auth callback")
 	}
 	if c.Test {
 		log.SetLevel(log.DebugLevel)
