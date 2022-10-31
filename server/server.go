@@ -118,6 +118,9 @@ func (c *Server) check() (err error) {
 	if c.IAMcb == nil {
 		return errors.New("please set spa accept packet auth callback")
 	}
+	if c.Test {
+		log.SetLevel(log.DebugLevel)
+	}
 	return nil
 }
 
