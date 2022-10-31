@@ -1,9 +1,9 @@
-package spa
+package libspa
 
 import (
 	"crypto/md5"
 	"fmt"
-	"github.com/1uLang/libspb/encrypt"
+	"github.com/1uLang/libspa/encrypt"
 	"github.com/pkg/errors"
 	"net"
 	"time"

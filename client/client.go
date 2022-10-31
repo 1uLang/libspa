@@ -2,10 +2,10 @@ package spaclient
 
 import (
 	"fmt"
-	"github.com/1uLang/libspb/encrypt"
-	"github.com/1uLang/libspb/spa"
+	"github.com/1uLang/libnet"
+	"github.com/1uLang/libspa"
+	"github.com/1uLang/libspa/encrypt"
 	"github.com/pkg/errors"
-	"net"
 	"strings"
 )
 
@@ -49,18 +49,13 @@ func New() *Client {
 		Method: SPAEncryptMethodAES256CFB,
 	}
 }
-func (c *Client) Send(body *spa.Body) (err error) {
+func (c *Client) Send(body *libspa.Body) (err error) {
 
 	if err := c.check(); err != nil {
 		return errors.New("config error:" + err.Error())
 	}
 	//初始化加密通用key,iv
-	encrypt.Init(c.KEY, c.IV)
-	c.method, err = encrypt.NewMethodInstance(c.Method, c.KEY, c.IV)
-	if err != nil {
-		c.print(err)
-		return errors.New("spa packet encrypt method error:" + err.Error())
-	}
+
 	switch c.Protocol {
 	case "tcp":
 		return c.connectTCP(body)
@@ -76,7 +71,7 @@ func (c *Client) check() error {
 	if c.Protocol != "tcp" && c.Protocol != "udp" {
 		return errors.New("please set server protocol tcp or udp")
 	}
-	if !spa.CheckPort(c.Port) {
+	if !libspa.CheckPort(c.Port) {
 		return InvalidConfigPort
 	}
 	if c.Addr == "" {
@@ -93,14 +88,14 @@ func (c *Client) print(a ...interface{}) {
 }
 
 // 连接tcp服务
-func (c *Client) connectTCP(body *spa.Body) error {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.Addr, c.Port))
+func (c *Client) connectTCP(body *libspa.Body) error {
+	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil)
 	if err != nil {
 		c.print("connect tcp server,err", err)
 		return err
 	}
 	defer conn.Close()
-	bytes, err := spa.NewPacket(body, c.method)
+	bytes, err := libspa.NewPacket(body, c.method)
 	if err != nil {
 		c.print("new spa packet,err", err)
 		return err
@@ -114,15 +109,14 @@ func (c *Client) connectTCP(body *spa.Body) error {
 }
 
 // 连接udp服务
-func (c *Client) connectUDP(body *spa.Body) error {
-
-	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP(c.Addr), Port: c.Port})
+func (c *Client) connectUDP(body *libspa.Body) error {
+	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil)
 	if err != nil {
 		c.print("connect udp server,err", err)
 		return err
 	}
 	defer conn.Close() //关闭连接
-	bytes, err := spa.NewPacket(body, c.method)
+	bytes, err := libspa.NewPacket(body, c.method)
 	if err != nil {
 		c.print("new spa packet,err", err)
 		return err

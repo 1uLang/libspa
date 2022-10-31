@@ -6,8 +6,8 @@ import (
 	"github.com/1uLang/libnet"
 	"github.com/1uLang/libnet/connection"
 	"github.com/1uLang/libnet/options"
-	"github.com/1uLang/libspb/iptables"
-	"github.com/1uLang/libspb/spa"
+	"github.com/1uLang/libspa"
+	"github.com/1uLang/libspa/iptables"
 	"github.com/fatih/color"
 	"net"
 	"strings"
@@ -37,7 +37,7 @@ type Server struct {
 	//spa 放行时间
 	Timeout int
 	//spa 身份认证回调
-	IAMcb func(body *spa.Body) (*Allow, error)
+	IAMcb func(body *libspa.Body) (*Allow, error)
 }
 type Allow struct {
 	Enable   bool
@@ -64,12 +64,12 @@ func (c *Server) OnConnect(conn *connection.Connection) {
 func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
 	c.print("data length:%d,addr:%v", len(buf), conn.RemoteAddr())
 	//解析udp spa 认证包
-	body, err := spa.ParsePacket(buf)
+	body, err := libspa.ParsePacket(buf)
 	if err != nil {
 		c.print("parse packet,err", err)
 		return
 	}
-	c.doIAM(body, spa.GetIP(conn.RemoteAddr()))
+	c.doIAM(body, libspa.GetIP(conn.RemoteAddr()))
 }
 
 // OnClose 当客户端主动断开链接或者超时时回调,err返回关闭的原因
@@ -102,7 +102,7 @@ func (c *Server) check() (err error) {
 	}
 	if c.Port == 0 {
 		//未设置端口随机设置一个未暂用的端口
-		c.Port, err = spa.GetPort()
+		c.Port, err = libspa.GetPort()
 		if err != nil {
 			return errors.New("random set listen port error:" + err.Error())
 		}
@@ -154,7 +154,7 @@ func (c *Server) listenUDP(opts ...options.Option) error {
 }
 
 // 进行身份检测
-func (c *Server) doIAM(body *spa.Body, ip string) {
+func (c *Server) doIAM(body *libspa.Body, ip string) {
 	if c.IAMcb != nil {
 		allow, err := c.IAMcb(body)
 		if err != nil {
@@ -172,7 +172,7 @@ func (c *Server) doIAM(body *spa.Body, ip string) {
 // 设置IP放行
 func (c *Server) doAllow(ip string, allow *Allow) {
 	for _, port := range allow.TcpPorts {
-		if spa.CheckPort(port) {
+		if libspa.CheckPort(port) {
 			err := iptables.OpenAddrPort(ip, "tcp", port, c.Timeout)
 			if err != nil {
 				c.print("set allow %s err:", ip)
@@ -180,7 +180,7 @@ func (c *Server) doAllow(ip string, allow *Allow) {
 		}
 	}
 	for _, port := range allow.UdpPorts {
-		if spa.CheckPort(port) {
+		if libspa.CheckPort(port) {
 			err := iptables.OpenAddrPort(ip, "udp", port, c.Timeout)
 			if err != nil {
 				c.print("set allow %s err:", ip)
