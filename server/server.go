@@ -139,11 +139,8 @@ func (c *Server) listenTCP(opts ...options.Option) error {
 	if err != nil {
 		panic(err)
 	}
-	err = svr.RunTCP()
-	if err != nil {
-		panic(err)
-	}
-	return nil
+
+	return svr.RunTCP()
 }
 
 // 开启udp服务监听端口
@@ -152,9 +149,7 @@ func (c *Server) listenUDP(opts ...options.Option) error {
 	if err != nil {
 		panic(err)
 	}
-	err = svr.RunUDP()
-
-	return nil
+	return svr.RunUDP()
 }
 
 // 设置IP放行
