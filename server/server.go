@@ -33,6 +33,7 @@ type Server struct {
 	Test bool
 	//spa 放行时间
 	Timeout int
+	options *options.Options
 	handler Handler
 }
 type Allow struct {
@@ -57,10 +58,10 @@ func (c *Server) OnConnect(conn *connection.Connection) {
 
 // OnMessage 当客户端有数据写入是回调
 func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
-	c.print("data length:%d,addr:%v", len(buf), conn.RemoteAddr())
+	c.print(fmt.Sprintf("data length:%d,addr:%v", len(buf), conn.RemoteAddr()))
 	//解析udp spa 认证包
 	if c.handler != nil {
-		allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf))
+		allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf, c.options.Key, c.options.Iv))
 		if err != nil {
 			c.print("parse packet,err", err)
 			return
@@ -86,6 +87,7 @@ func (c *Server) Run(handler Handler, opts ...options.Option) error {
 		return errors.New("config error:" + err.Error())
 	}
 	c.handler = handler
+	c.options = options.GetOptions(opts...)
 	//初始化加密通用key,iv
 	color.Green("start spa server,listen 0.0.0.0:%d[%s]\n", c.Port, c.Protocol)
 	switch c.Protocol {

@@ -3,6 +3,7 @@ package spaclient
 import (
 	"fmt"
 	"github.com/1uLang/libnet"
+	"github.com/1uLang/libnet/options"
 	"github.com/1uLang/libspa"
 	"github.com/1uLang/libspa/encrypt"
 	"github.com/pkg/errors"
@@ -95,7 +96,13 @@ func (c *Client) print(a ...interface{}) {
 
 // 连接tcp服务
 func (c *Client) connectTCP(body *libspa.Body) error {
-	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil)
+	opts := []options.Option{}
+	if c.method != nil {
+		opts = append(opts, options.WithEncryptMethod(c.method),
+			options.WithEncryptMethodPrivateKey([]byte(c.KEY)),
+			options.WithEncryptMethodPublicKey([]byte(c.IV)))
+	}
+	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil, opts...)
 	if err != nil {
 		c.print("connect tcp server,err", err)
 		return err
@@ -104,6 +111,11 @@ func (c *Client) connectTCP(body *libspa.Body) error {
 	bytes, err := libspa.NewPacket(body, c.method)
 	if err != nil {
 		c.print("new spa packet,err", err)
+		return err
+	}
+	err = conn.DialTCP()
+	if err != nil {
+		c.print("connect tcp server,err", err)
 		return err
 	}
 	_, err = conn.Write(bytes)
@@ -116,7 +128,13 @@ func (c *Client) connectTCP(body *libspa.Body) error {
 
 // 连接udp服务
 func (c *Client) connectUDP(body *libspa.Body) error {
-	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil)
+	opts := []options.Option{}
+	if c.method != nil {
+		opts = append(opts, options.WithEncryptMethod(c.method),
+			options.WithEncryptMethodPrivateKey([]byte(c.KEY)),
+			options.WithEncryptMethodPublicKey([]byte(c.IV)))
+	}
+	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil, opts...)
 	if err != nil {
 		c.print("connect udp server,err", err)
 		return err
@@ -125,6 +143,11 @@ func (c *Client) connectUDP(body *libspa.Body) error {
 	bytes, err := libspa.NewPacket(body, c.method)
 	if err != nil {
 		c.print("new spa packet,err", err)
+		return err
+	}
+	err = conn.DialUDP()
+	if err != nil {
+		c.print("connect udp server,err", err)
 		return err
 	}
 	_, err = conn.Write(bytes)

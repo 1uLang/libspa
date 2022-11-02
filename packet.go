@@ -27,6 +27,7 @@ const (
 var (
 	InvalidStartCodePacket = errors.New("invalid packet (packet start code is error)")
 	InvalidMethodPacket    = errors.New("invalid packet (packet method is not support)")
+	InvalidMethodSecret    = errors.New("invalid packet (packet method secret is error)")
 	InvalidSignPacket      = errors.New("invalid packet (packet sign is error)")
 	InvalidBodyPacket      = errors.New("invalid packet (body packet length is error)")
 	VersionLowPacket       = errors.New("version low packet")
@@ -87,7 +88,7 @@ func NewPacket(body *Body, method encrypt.MethodInterface) ([]byte, error) {
 }
 
 // ParsePacket 解析spa报
-func ParsePacket(data []byte) (body *Body, err error) {
+func ParsePacket(data []byte, key, iv []byte) (body *Body, err error) {
 
 	offset := 0
 	if !checkStartCode(data) {
@@ -104,6 +105,10 @@ func ParsePacket(data []byte) (body *Body, err error) {
 	c, err := encrypt.GetMethodInstance(method)
 	if err != nil {
 		return nil, InvalidMethodPacket
+	}
+	err = c.Init(key, iv)
+	if err != nil {
+		return nil, InvalidMethodSecret
 	}
 
 	md5sum := make([]byte, packetSignLength)
@@ -130,7 +135,10 @@ func encodeHeader(version byte, method encrypt.MethodInterface) []byte {
 	header[0] = byte(startCode & 0x00ff)
 	header[1] = byte(startCode >> 8)
 	header[2] = version
-	header[3] = method.Method()
+	header[3] = 0
+	if method != nil {
+		header[3] = method.Method()
+	}
 	return header
 }
 
@@ -236,11 +244,15 @@ func (body *Body) Encrypt(c encrypt.MethodInterface) ([]byte, error) {
 	for k, v := range md5sum {
 		bytes[k] = v
 	}
-	bEncrypt, err := c.Encrypt(bodyEncodes)
-	if err != nil {
-		return nil, errors.New("bode encrypt failed:" + err.Error())
+	if c != nil {
+		bEncrypt, err := c.Encrypt(bodyEncodes)
+		if err != nil {
+			return nil, errors.New("bode encrypt failed:" + err.Error())
+		}
+		bytes = append(bytes, bEncrypt...)
+	} else {
+		bytes = append(bytes, bodyEncodes...)
 	}
-	bytes = append(bytes, bEncrypt...)
 	return bytes, nil
 }
 
