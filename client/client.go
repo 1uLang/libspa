@@ -66,7 +66,7 @@ func (c *Client) Send(body *libspa.Body) (err error) {
 }
 
 // 检测配置是否正确
-func (c *Client) check() error {
+func (c *Client) check() (err error) {
 	c.Protocol = strings.ToLower(c.Protocol)
 	if c.Protocol != "tcp" && c.Protocol != "udp" {
 		return errors.New("please set server protocol tcp or udp")
@@ -76,6 +76,12 @@ func (c *Client) check() error {
 	}
 	if c.Addr == "" {
 		return errors.New("please set spa server addr")
+	}
+	if c.Method != "" {
+		c.method, err = encrypt.NewMethodInstance(c.Method, c.KEY, c.IV)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
