@@ -3,7 +3,7 @@ module github.com/1uLang/libspa
 go 1.16
 
 require (
-	github.com/1uLang/libnet v0.0.0-20221031130218-a507da78e8fe
+	github.com/1uLang/libnet v0.0.0-20221102033556-6aed90f7ecc7
 	github.com/ZZMarquis/gm v1.3.2
 	github.com/fatih/color v1.13.0
 	github.com/pkg/errors v0.9.1
