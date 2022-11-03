@@ -99,8 +99,8 @@ func (c *Client) connectTCP(body *libspa.Body) error {
 	opts := []options.Option{}
 	if c.method != nil {
 		opts = append(opts, options.WithEncryptMethod(c.method),
-			options.WithEncryptMethodPrivateKey([]byte(c.KEY)),
-			options.WithEncryptMethodPublicKey([]byte(c.IV)))
+			options.WithPrivateKey([]byte(c.KEY)),
+			options.WithPublicKey([]byte(c.IV)))
 	}
 	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil, opts...)
 	if err != nil {
@@ -131,8 +131,8 @@ func (c *Client) connectUDP(body *libspa.Body) error {
 	opts := []options.Option{}
 	if c.method != nil {
 		opts = append(opts, options.WithEncryptMethod(c.method),
-			options.WithEncryptMethodPrivateKey([]byte(c.KEY)),
-			options.WithEncryptMethodPublicKey([]byte(c.IV)))
+			options.WithPrivateKey([]byte(c.KEY)),
+			options.WithPublicKey([]byte(c.IV)))
 	}
 	conn, err := libnet.NewClient(fmt.Sprintf("%s:%d", c.Addr, c.Port), nil, opts...)
 	if err != nil {

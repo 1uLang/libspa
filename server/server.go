@@ -4,18 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/1uLang/libnet"
-	"github.com/1uLang/libnet/connection"
 	"github.com/1uLang/libnet/options"
 	"github.com/1uLang/libspa"
 	"github.com/1uLang/libspa/iptables"
-	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
-)
-
-const (
-	magicKey = "f1c8eafb543f03023e97b7be864a4e9b"
 )
 
 var (
@@ -50,18 +44,18 @@ func New() *Server {
 }
 
 // OnConnect 当TCP长连接建立成功是回调
-func (c *Server) OnConnect(conn *connection.Connection) {
+func (c *Server) OnConnect(conn *libnet.Connection) {
 	if c.handler != nil {
 		c.handler.OnConnect(conn)
 	}
 }
 
 // OnMessage 当客户端有数据写入是回调
-func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
+func (c *Server) OnMessage(conn *libnet.Connection, buf []byte) {
 	c.print(fmt.Sprintf("data length:%d,addr:%v", len(buf), conn.RemoteAddr()))
 	//解析udp spa 认证包
 	if c.handler != nil {
-		allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf, c.options.Key, c.options.Iv))
+		allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf, c.options.PrivateKey, c.options.PublicKey))
 		if err != nil {
 			c.print("parse packet,err", err)
 			return
@@ -75,9 +69,9 @@ func (c *Server) OnMessage(conn *connection.Connection, buf []byte) {
 }
 
 // OnClose 当客户端主动断开链接或者超时时回调,err返回关闭的原因
-func (c *Server) OnClose(conn *connection.Connection, err error) {
+func (c *Server) OnClose(conn *libnet.Connection, reason string) {
 	if c.handler != nil {
-		c.handler.OnClose(conn, err)
+		c.handler.OnClose(conn, errors.New(reason))
 	}
 }
 
@@ -89,7 +83,6 @@ func (c *Server) Run(handler Handler, opts ...options.Option) error {
 	c.handler = handler
 	c.options = options.GetOptions(opts...)
 	//初始化加密通用key,iv
-	color.Green("start spa server,listen 0.0.0.0:%d[%s]\n", c.Port, c.Protocol)
 	switch c.Protocol {
 	case "tcp":
 		return c.listenTCP(opts...)
@@ -136,22 +129,12 @@ func (c *Server) print(a ...interface{}) {
 
 // 开启tcp服务监听端口
 func (c *Server) listenTCP(opts ...options.Option) error {
-
-	svr, err := libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...)
-	if err != nil {
-		panic(err)
-	}
-
-	return svr.RunTCP()
+	return libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...).RunTCP()
 }
 
 // 开启udp服务监听端口
 func (c *Server) listenUDP(opts ...options.Option) error {
-	svr, err := libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...)
-	if err != nil {
-		panic(err)
-	}
-	return svr.RunUDP()
+	return libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...).RunUDP()
 }
 
 // 设置IP放行
