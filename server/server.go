@@ -6,10 +6,11 @@ import (
 	"github.com/1uLang/libnet"
 	"github.com/1uLang/libnet/options"
 	"github.com/1uLang/libspa"
-	"github.com/1uLang/libspa/iptables"
+	"github.com/1uLang/libspa/encrypt"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
+	"time"
 )
 
 var (
@@ -19,6 +20,12 @@ var (
 )
 
 type Server struct {
+	//加密key
+	KEY string
+	//加密iv
+	IV string
+	//加密方式
+	Method string
 	//协议
 	Protocol string
 	//监听端口
@@ -26,10 +33,16 @@ type Server struct {
 	//测试模式
 	Test bool
 	//spa 放行时间
-	Timeout int
-	options *options.Options
+	SPATimeout int
+	//读超时时间
+	RawTimeout int
+	//连接处理接口
 	handler Handler
+
+	options *options.Options
+	method  encrypt.MethodInterface
 }
+
 type Allow struct {
 	TcpPorts []int
 	UdpPorts []int
@@ -38,49 +51,26 @@ type Allow struct {
 // New 创建spa服务
 func New() *Server {
 	return &Server{
-		Protocol: "udp",
-		Timeout:  30,
-	}
-}
-
-// OnConnect 当TCP长连接建立成功是回调
-func (c *Server) OnConnect(conn *libnet.Connection) {
-	if c.handler != nil {
-		c.handler.OnConnect(conn)
-	}
-}
-
-// OnMessage 当客户端有数据写入是回调
-func (c *Server) OnMessage(conn *libnet.Connection, buf []byte) {
-	c.print(fmt.Sprintf("data length:%d,addr:%v", len(buf), conn.RemoteAddr()))
-	//解析udp spa 认证包
-	if c.handler != nil {
-		allow, err := c.handler.OnAuthority(libspa.ParsePacket(buf, c.options.PrivateKey, c.options.PublicKey))
-		if err != nil {
-			c.print("parse packet,err", err)
-			return
-		}
-		if allow != nil {
-			c.doAllow(libspa.GetIP(conn.RemoteAddr()), allow)
-		} else {
-			c.print("[%s] is block", libspa.GetIP(conn.RemoteAddr()))
-		}
-	}
-}
-
-// OnClose 当客户端主动断开链接或者超时时回调,err返回关闭的原因
-func (c *Server) OnClose(conn *libnet.Connection, reason string) {
-	if c.handler != nil {
-		c.handler.OnClose(conn, errors.New(reason))
+		Protocol:   "udp",
+		SPATimeout: 30,
 	}
 }
 
 // Run 启动spa服务
-func (c *Server) Run(handler Handler, opts ...options.Option) error {
+func (c *Server) Run() error {
 	if err := c.check(); err != nil {
 		return errors.New("config error:" + err.Error())
 	}
-	c.handler = handler
+
+	opts := []options.Option{}
+	if c.method != nil {
+		opts = append(opts, options.WithEncryptMethod(c.method),
+			options.WithPrivateKey([]byte(c.KEY)),
+			options.WithPublicKey([]byte(c.IV)))
+		if c.RawTimeout > 0 {
+			opts = append(opts, options.WithTimeout(time.Duration(c.RawTimeout)))
+		}
+	}
 	c.options = options.GetOptions(opts...)
 	//初始化加密通用key,iv
 	switch c.Protocol {
@@ -90,6 +80,11 @@ func (c *Server) Run(handler Handler, opts ...options.Option) error {
 		return c.listenUDP(opts...)
 	}
 	return nil
+}
+
+// SetHandler 设置连接处理接口
+func (c *Server) SetHandler(h Handler) {
+	c.handler = h
 }
 
 // 检测配置是否正确
@@ -113,8 +108,14 @@ func (c *Server) check() (err error) {
 		return InvalidConfigPortUse
 	}
 	ln.Close()
-	if c.Timeout <= 0 {
+	if c.SPATimeout <= 0 {
 		return InvalidConfigTimeout
+	}
+	if c.Method != "" {
+		c.method, err = encrypt.NewMethodInstance(c.Method, c.KEY, c.IV)
+		if err != nil {
+			return err
+		}
 	}
 	if c.Test {
 		log.SetLevel(log.DebugLevel)
@@ -129,30 +130,10 @@ func (c *Server) print(a ...interface{}) {
 
 // 开启tcp服务监听端口
 func (c *Server) listenTCP(opts ...options.Option) error {
-	return libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...).RunTCP()
+	return libnet.NewServe(fmt.Sprintf(":%d", c.Port), &handler{timeout: c.SPATimeout, handler: c.handler, options: c.options}, opts...).RunTCP()
 }
 
 // 开启udp服务监听端口
 func (c *Server) listenUDP(opts ...options.Option) error {
-	return libnet.NewServe(fmt.Sprintf(":%d", c.Port), c, opts...).RunUDP()
-}
-
-// 设置IP放行
-func (c *Server) doAllow(ip string, allow *Allow) {
-	for _, port := range allow.TcpPorts {
-		if libspa.CheckPort(port) {
-			err := iptables.OpenAddrPort(ip, "tcp", port, c.Timeout)
-			if err != nil {
-				c.print("set allow %s err:", ip)
-			}
-		}
-	}
-	for _, port := range allow.UdpPorts {
-		if libspa.CheckPort(port) {
-			err := iptables.OpenAddrPort(ip, "udp", port, c.Timeout)
-			if err != nil {
-				c.print("set allow %s err:", ip)
-			}
-		}
-	}
+	return libnet.NewServe(fmt.Sprintf(":%d", c.Port), &handler{timeout: c.SPATimeout, handler: c.handler, options: c.options}, opts...).RunUDP()
 }
