@@ -6,5 +6,5 @@ import (
 
 func main() {
 	srv := spaserver.New()
-	srv.Run(nil)
+	srv.Run()
 }
