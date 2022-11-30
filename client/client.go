@@ -107,7 +107,6 @@ func (c *Client) connectTCP(body *libspa.Body) error {
 		c.print("connect tcp server,err", err)
 		return err
 	}
-	defer conn.Close()
 	bytes, err := libspa.NewPacket(body, c.method)
 	if err != nil {
 		c.print("new spa packet,err", err)
@@ -118,6 +117,7 @@ func (c *Client) connectTCP(body *libspa.Body) error {
 		c.print("connect tcp server,err", err)
 		return err
 	}
+	defer conn.Close()
 	_, err = conn.Write(bytes)
 	if err != nil {
 		c.print("send spa packet,err", err)
@@ -139,7 +139,6 @@ func (c *Client) connectUDP(body *libspa.Body) error {
 		c.print("connect udp server,err", err)
 		return err
 	}
-	defer conn.Close() //关闭连接
 	bytes, err := libspa.NewPacket(body, c.method)
 	if err != nil {
 		c.print("new spa packet,err", err)
@@ -150,6 +149,7 @@ func (c *Client) connectUDP(body *libspa.Body) error {
 		c.print("connect udp server,err", err)
 		return err
 	}
+	defer conn.Close()
 	_, err = conn.Write(bytes)
 	if err != nil {
 		c.print("send spa packet,err", err)
